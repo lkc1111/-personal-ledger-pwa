@@ -109,7 +109,7 @@ function bindEvents() {
 
   els.quickAddButton.addEventListener("click", () => {
     switchView("ledger");
-    els.entryCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => els.amount.focus(), 250);
   });
 
@@ -278,7 +278,7 @@ function startEditEntry(id) {
   els.saveEntryButton.textContent = "保存修改";
   els.cancelEditButton.hidden = false;
   switchView("ledger");
-  els.entryCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
   setTimeout(() => els.amount.focus(), 250);
 }
 
