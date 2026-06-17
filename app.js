@@ -1,5 +1,7 @@
 const STORAGE_KEY = "personal-ledger-v1";
 const BUDGET_KEY = "personal-ledger-budgets-v1";
+const THEME_KEY = "personal-ledger-theme-v1";
+const LAST_BACKUP_KEY = "personal-ledger-last-backup-v1";
 
 const categories = {
   expense: ["餐饮", "交通", "购物", "住房", "娱乐", "医疗", "学习", "其他支出"],
@@ -18,6 +20,10 @@ const state = {
   budgets: loadJson(BUDGET_KEY, {}),
   selectedMonth: toMonthValue(new Date()),
   activeView: "ledger",
+  editingId: null,
+  searchQuery: "",
+  typeFilter: "all",
+  theme: localStorage.getItem(THEME_KEY) || "light",
   deferredInstallPrompt: null
 };
 
@@ -28,6 +34,9 @@ const els = {
   navItems: document.querySelectorAll(".nav-item"),
   quickAddButton: document.querySelector("#quickAddButton"),
   form: document.querySelector("#entryForm"),
+  formTitle: document.querySelector("#formTitle"),
+  saveEntryButton: document.querySelector("#saveEntryButton"),
+  cancelEditButton: document.querySelector("#cancelEditButton"),
   entryCard: document.querySelector("#entryCard"),
   monthPicker: document.querySelector("#monthPicker"),
   prevMonth: document.querySelector("#prevMonth"),
@@ -37,11 +46,18 @@ const els = {
   category: document.querySelector("#categoryInput"),
   note: document.querySelector("#noteInput"),
   list: document.querySelector("#entryList"),
+  searchInput: document.querySelector("#searchInput"),
+  typeFilter: document.querySelector("#typeFilter"),
   template: document.querySelector("#entryTemplate"),
   empty: document.querySelector("#emptyState"),
   monthIncome: document.querySelector("#monthIncome"),
   monthExpense: document.querySelector("#monthExpense"),
   monthBalance: document.querySelector("#monthBalance"),
+  todayExpense: document.querySelector("#todayExpense"),
+  weekExpense: document.querySelector("#weekExpense"),
+  monthProgressLabel: document.querySelector("#monthProgressLabel"),
+  monthProgressText: document.querySelector("#monthProgressText"),
+  monthProgressFill: document.querySelector("#monthProgressFill"),
   clearMonth: document.querySelector("#clearMonthButton"),
   chartMonthLabel: document.querySelector("#chartMonthLabel"),
   chartIncome: document.querySelector("#chartIncome"),
@@ -52,11 +68,23 @@ const els = {
   budgetDonut: document.querySelector("#budgetDonut"),
   budgetCenter: document.querySelector("#budgetCenter"),
   budgetLeft: document.querySelector("#budgetLeft"),
+  largestExpense: document.querySelector("#largestExpense"),
+  largestExpenseNote: document.querySelector("#largestExpenseNote"),
+  dailyAverage: document.querySelector("#dailyAverage"),
+  budgetAdvice: document.querySelector("#budgetAdvice"),
   saveBudgetButton: document.querySelector("#saveBudgetButton"),
   categoryChart: document.querySelector("#categoryChart"),
+  sevenDayChart: document.querySelector("#sevenDayChart"),
   reportList: document.querySelector("#reportList"),
+  yearLabel: document.querySelector("#yearLabel"),
+  yearIncome: document.querySelector("#yearIncome"),
+  yearExpense: document.querySelector("#yearExpense"),
+  yearBalance: document.querySelector("#yearBalance"),
   profileSummary: document.querySelector("#profileSummary"),
+  backupAge: document.querySelector("#backupAge"),
+  themeInputs: document.querySelectorAll("input[name='themeMode']"),
   exportButton: document.querySelector("#exportButton"),
+  exportCsvButton: document.querySelector("#exportCsvButton"),
   importInput: document.querySelector("#importInput"),
   backupStatus: document.querySelector("#backupStatus"),
   installButton: document.querySelector("#installButton")
@@ -65,6 +93,7 @@ const els = {
 init();
 
 function init() {
+  applyTheme(state.theme);
   els.monthPicker.value = state.selectedMonth;
   els.date.value = toDateValue(new Date());
   renderCategories(getSelectedType());
@@ -92,8 +121,10 @@ function bindEvents() {
 
   els.form.addEventListener("submit", (event) => {
     event.preventDefault();
-    addEntry();
+    saveEntryFromForm();
   });
+
+  els.cancelEditButton.addEventListener("click", resetEntryForm);
 
   els.monthPicker.addEventListener("change", () => {
     state.selectedMonth = els.monthPicker.value || toMonthValue(new Date());
@@ -105,8 +136,24 @@ function bindEvents() {
 
   els.list.addEventListener("click", (event) => {
     const button = event.target.closest(".delete-button");
-    if (!button) return;
-    deleteEntry(button.dataset.id);
+    const editButton = event.target.closest(".edit-button");
+    if (button) {
+      deleteEntry(button.dataset.id);
+      return;
+    }
+    if (editButton) {
+      startEditEntry(editButton.dataset.id);
+    }
+  });
+
+  els.searchInput.addEventListener("input", () => {
+    state.searchQuery = els.searchInput.value.trim().toLowerCase();
+    render();
+  });
+
+  els.typeFilter.addEventListener("change", () => {
+    state.typeFilter = els.typeFilter.value;
+    render();
   });
 
   els.clearMonth.addEventListener("click", () => {
@@ -131,7 +178,17 @@ function bindEvents() {
   });
 
   els.exportButton.addEventListener("click", exportBackup);
+  els.exportCsvButton.addEventListener("click", exportCsv);
   els.importInput.addEventListener("change", importBackup);
+
+  els.themeInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      if (!input.checked) return;
+      state.theme = input.value;
+      localStorage.setItem(THEME_KEY, state.theme);
+      applyTheme(state.theme);
+    });
+  });
 
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
@@ -153,6 +210,15 @@ function bindEvents() {
   });
 }
 
+function applyTheme(theme) {
+  const normalized = theme === "dark" ? "dark" : "light";
+  document.body.dataset.theme = normalized;
+  document.querySelector("meta[name='theme-color']").setAttribute("content", normalized === "dark" ? "#101413" : "#f4f7f6");
+  els.themeInputs.forEach((input) => {
+    input.checked = input.value === normalized;
+  });
+}
+
 function switchView(view) {
   state.activeView = view;
   els.views.forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
@@ -162,7 +228,7 @@ function switchView(view) {
   render();
 }
 
-function addEntry() {
+function saveEntryFromForm() {
   const amount = Number.parseFloat(els.amount.value);
   const date = els.date.value;
   const type = getSelectedType();
@@ -171,29 +237,65 @@ function addEntry() {
 
   if (!Number.isFinite(amount) || amount <= 0 || !date || !category) return;
 
-  state.entries.unshift({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+  const payload = {
+    id: state.editingId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     type,
     amount: Math.round(amount * 100) / 100,
     date,
     category,
     note,
     createdAt: new Date().toISOString()
-  });
+  };
+
+  if (state.editingId) {
+    const oldEntry = state.entries.find((entry) => entry.id === state.editingId);
+    payload.createdAt = oldEntry?.createdAt || payload.createdAt;
+    state.entries = state.entries.map((entry) => entry.id === state.editingId ? payload : entry);
+  } else {
+    state.entries.unshift(payload);
+  }
 
   state.selectedMonth = date.slice(0, 7);
   els.monthPicker.value = state.selectedMonth;
-  els.form.reset();
-  document.querySelector("input[name='type'][value='expense']").checked = true;
-  els.date.value = date;
-  renderCategories("expense");
+  resetEntryForm(date);
   saveEntries();
   render();
   els.amount.focus();
 }
 
+function startEditEntry(id) {
+  const entry = state.entries.find((item) => item.id === id);
+  if (!entry) return;
+
+  state.editingId = id;
+  document.querySelector(`input[name='type'][value='${entry.type}']`).checked = true;
+  renderCategories(entry.type);
+  els.amount.value = entry.amount;
+  els.date.value = entry.date;
+  els.category.value = entry.category;
+  els.note.value = entry.note;
+  els.formTitle.textContent = "编辑记录";
+  els.saveEntryButton.textContent = "保存修改";
+  els.cancelEditButton.hidden = false;
+  switchView("ledger");
+  els.entryCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => els.amount.focus(), 250);
+}
+
+function resetEntryForm(keepDate = toDateValue(new Date())) {
+  state.editingId = null;
+  els.form.reset();
+  document.querySelector("input[name='type'][value='expense']").checked = true;
+  els.date.value = keepDate;
+  renderCategories("expense");
+  els.formTitle.textContent = "新增记录";
+  els.saveEntryButton.textContent = "保存记录";
+  els.cancelEditButton.hidden = true;
+}
+
 function deleteEntry(id) {
   state.entries = state.entries.filter((entry) => entry.id !== id);
+  if (state.editingId === id) resetEntryForm();
   saveEntries();
   render();
 }
@@ -215,7 +317,40 @@ function exportBackup() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
   setBackupStatus(`已导出 ${state.entries.length} 条记录`);
+  renderProfile();
+}
+
+function exportCsv() {
+  const header = ["类型", "金额", "日期", "分类", "备注", "创建时间"];
+  const rows = state.entries
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
+    .map((entry) => [
+      entry.type === "income" ? "收入" : "支出",
+      entry.amount,
+      entry.date,
+      entry.category,
+      entry.note,
+      entry.createdAt
+    ]);
+  const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `personal-ledger-${toDateValue(new Date())}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setBackupStatus("已导出 CSV，可用 Excel 打开");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 async function importBackup(event) {
@@ -316,7 +451,8 @@ function render() {
   const monthlyEntries = getMonthlyEntries();
   const totals = getTotals(monthlyEntries);
   renderSummary(totals);
-  renderList(monthlyEntries);
+  renderQuickStats(monthlyEntries, totals);
+  renderList(getFilteredEntries(monthlyEntries));
   renderCharts(monthlyEntries, totals);
   renderReports();
   renderProfile();
@@ -326,6 +462,27 @@ function renderSummary(totals) {
   els.monthIncome.textContent = money(totals.income);
   els.monthExpense.textContent = money(totals.expense);
   els.monthBalance.textContent = money(totals.income - totals.expense);
+}
+
+function renderQuickStats(monthlyEntries, totals) {
+  const today = toDateValue(new Date());
+  const weekStart = getWeekStart(new Date());
+  const todayExpense = monthlyEntries
+    .filter((entry) => entry.type === "expense" && entry.date === today)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  const weekExpense = monthlyEntries
+    .filter((entry) => entry.type === "expense" && new Date(`${entry.date}T00:00:00`) >= weekStart)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  const budget = state.budgets[state.selectedMonth] || 0;
+  const usedRatio = budget > 0 ? Math.min(totals.expense / budget, 1) : 0;
+
+  els.todayExpense.textContent = money(todayExpense);
+  els.weekExpense.textContent = money(weekExpense);
+  els.monthProgressText.textContent = budget > 0
+    ? `${money(totals.expense)} / ${money(budget)}`
+    : "未设置";
+  els.monthProgressLabel.textContent = budget > 0 ? "本月预算使用" : "本月预算";
+  els.monthProgressFill.style.width = `${usedRatio * 100}%`;
 }
 
 function renderList(entries) {
@@ -349,6 +506,7 @@ function renderList(entries) {
       item.querySelector(".entry-date").textContent = formatDate(entry.date);
       item.querySelector(".entry-date").dateTime = entry.date;
       item.querySelector(".delete-button").dataset.id = entry.id;
+      item.querySelector(".edit-button").dataset.id = entry.id;
       fragment.append(item);
     });
 
@@ -361,6 +519,8 @@ function renderCharts(entries, totals) {
   els.chartExpense.textContent = money(totals.expense);
   els.chartBalance.textContent = money(totals.income - totals.expense);
   renderBudget(entries);
+  renderInsights(entries);
+  renderSevenDayChart();
   renderCategoryChart(entries);
 }
 
@@ -376,6 +536,28 @@ function renderBudget(entries) {
   els.budgetPercent.textContent = budget > 0 ? `${usedPercent}%` : "--";
   els.budgetCenter.textContent = budget > 0 ? `${usedPercent}%` : "--";
   els.budgetDonut.style.background = `conic-gradient(var(--yellow) ${usedRatio * 360}deg, #38393d 0deg)`;
+}
+
+function renderInsights(entries) {
+  const expenses = entries.filter((entry) => entry.type === "expense");
+  const largest = expenses.slice().sort((a, b) => b.amount - a.amount)[0];
+  const expenseTotal = expenses.reduce((sum, entry) => sum + entry.amount, 0);
+  const averageDays = getElapsedDaysForMonth(state.selectedMonth);
+  const dailyAverage = averageDays > 0 ? expenseTotal / averageDays : 0;
+  const budget = state.budgets[state.selectedMonth] || 0;
+
+  els.largestExpense.textContent = largest ? money(largest.amount) : money(0);
+  els.largestExpenseNote.textContent = largest ? `${largest.category} · ${largest.note || formatDate(largest.date)}` : "暂无";
+  els.dailyAverage.textContent = money(dailyAverage);
+
+  if (!budget) {
+    els.budgetAdvice.textContent = "设置预算后，会在这里提醒本月花费节奏。";
+  } else if (expenseTotal > budget) {
+    els.budgetAdvice.textContent = "本月支出已经超过预算，建议先暂停非必要消费。";
+  } else {
+    const left = budget - expenseTotal;
+    els.budgetAdvice.textContent = `距离预算还剩 ${money(left)}，继续保持。`;
+  }
 }
 
 function renderCategoryChart(entries) {
@@ -404,8 +586,36 @@ function renderCategoryChart(entries) {
   });
 }
 
+function renderSevenDayChart() {
+  const days = getRecentDays(7);
+  const expensesByDate = state.entries
+    .filter((entry) => entry.type === "expense")
+    .reduce((acc, entry) => {
+      acc[entry.date] = (acc[entry.date] || 0) + entry.amount;
+      return acc;
+    }, {});
+  const rows = days.map((date) => ({
+    date,
+    amount: expensesByDate[date] || 0
+  }));
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+
+  els.sevenDayChart.textContent = "";
+  rows.forEach((row) => {
+    const bar = document.createElement("div");
+    bar.className = "day-bar";
+    bar.innerHTML = `
+      <div class="day-fill" style="height:${Math.max((row.amount / max) * 96, 8)}px"></div>
+      <span>${formatShortDay(row.date)}</span>
+      <strong>${row.amount ? compactMoney(row.amount) : "0"}</strong>
+    `;
+    els.sevenDayChart.append(bar);
+  });
+}
+
 function renderReports() {
   const months = getMonthReports();
+  renderYearSummary();
   els.reportList.textContent = "";
 
   if (months.length === 0) {
@@ -430,6 +640,8 @@ function renderReports() {
 
 function renderProfile() {
   els.profileSummary.textContent = `本机保存 ${state.entries.length} 条记录`;
+  const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
+  els.backupAge.textContent = lastBackup ? formatBackupAge(lastBackup) : "未备份";
 }
 
 function renderCategories(type) {
@@ -444,6 +656,15 @@ function renderCategories(type) {
 
 function getMonthlyEntries() {
   return state.entries.filter((entry) => entry.date.startsWith(state.selectedMonth));
+}
+
+function getFilteredEntries(entries) {
+  return entries.filter((entry) => {
+    const matchesType = state.typeFilter === "all" || entry.type === state.typeFilter;
+    const text = `${entry.category} ${entry.note}`.toLowerCase();
+    const matchesSearch = !state.searchQuery || text.includes(state.searchQuery);
+    return matchesType && matchesSearch;
+  });
 }
 
 function getTotals(entries) {
@@ -467,6 +688,16 @@ function getMonthReports() {
   return Array.from(reports.values())
     .sort((a, b) => b.month.localeCompare(a.month))
     .map((item) => ({ ...item, label: formatMonth(item.month) }));
+}
+
+function renderYearSummary() {
+  const year = new Date().getFullYear();
+  const entries = state.entries.filter((entry) => entry.date.startsWith(`${year}-`));
+  const totals = getTotals(entries);
+  els.yearLabel.textContent = `${year}`;
+  els.yearIncome.textContent = money(totals.income);
+  els.yearExpense.textContent = money(totals.expense);
+  els.yearBalance.textContent = money(totals.income - totals.expense);
 }
 
 function changeMonth(step) {
@@ -511,6 +742,48 @@ function formatDate(value) {
 function formatMonth(value) {
   const [, month] = value.split("-");
   return `${Number(month)}月`;
+}
+
+function formatShortDay(value) {
+  const [, month, day] = value.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function compactMoney(value) {
+  if (value >= 10000) return `${Math.round(value / 1000) / 10}万`;
+  if (value >= 1000) return `${Math.round(value)}`;
+  return `${Math.round(value)}`;
+}
+
+function formatBackupAge(value) {
+  const backupDate = new Date(value);
+  if (Number.isNaN(backupDate.getTime())) return "未备份";
+  const diffDays = Math.floor((Date.now() - backupDate.getTime()) / 86400000);
+  if (diffDays <= 0) return "今天已备份";
+  return `${diffDays} 天前备份`;
+}
+
+function getElapsedDaysForMonth(monthValue) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const now = new Date();
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
+  if (isCurrentMonth) return now.getDate();
+  return new Date(year, month, 0).getDate();
+}
+
+function getRecentDays(count) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (count - 1 - index));
+    return toDateValue(date);
+  });
+}
+
+function getWeekStart(date) {
+  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = copy.getDay() || 7;
+  copy.setDate(copy.getDate() - day + 1);
+  return copy;
 }
 
 function toDateValue(date) {

@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#111111">
     <meta name="description" content="一个离线可用的个人账本 PWA">
     <title>个人账本</title>
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="icons/icon.svg">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="/-personal-ledger-pwa/manifest.webmanifest">
+    <link rel="icon" href="/-personal-ledger-pwa/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/-personal-ledger-pwa/icons/icon.svg">
+    <link rel="stylesheet" href="/-personal-ledger-pwa/styles.css?v=6">
   </head>
   <body>
     <div class="app-shell">
@@ -46,9 +46,32 @@
                 <strong id="monthBalance">¥0.00</strong>
               </article>
             </div>
+            <div class="quick-stats">
+              <article>
+                <span>今日支出</span>
+                <strong id="todayExpense">¥0.00</strong>
+              </article>
+              <article>
+                <span>本周支出</span>
+                <strong id="weekExpense">¥0.00</strong>
+              </article>
+            </div>
+            <div class="month-progress">
+              <div>
+                <span id="monthProgressLabel">本月预算</span>
+                <strong id="monthProgressText">未设置</strong>
+              </div>
+              <div class="progress-track">
+                <div id="monthProgressFill" class="progress-fill"></div>
+              </div>
+            </div>
           </section>
 
           <section class="card entry-card" id="entryCard">
+            <div class="section-title">
+              <h2 id="formTitle">新增记录</h2>
+              <button id="cancelEditButton" class="ghost-button" type="button" hidden>取消编辑</button>
+            </div>
             <form id="entryForm" autocomplete="off">
               <div class="segmented" role="group" aria-label="收支类型">
                 <label>
@@ -83,7 +106,7 @@
                 <input id="noteInput" name="note" type="text" maxlength="40" placeholder="可选，例如：午餐、工资">
               </label>
 
-              <button class="primary-button" type="submit">保存记录</button>
+              <button class="primary-button" id="saveEntryButton" type="submit">保存记录</button>
             </form>
           </section>
 
@@ -91,6 +114,14 @@
             <div class="section-title">
               <h2>本月记录</h2>
               <button id="clearMonthButton" class="ghost-button" type="button">清空</button>
+            </div>
+            <div class="filter-panel">
+              <input id="searchInput" type="search" placeholder="搜索分类或备注">
+              <select id="typeFilter">
+                <option value="all">全部</option>
+                <option value="expense">只看支出</option>
+                <option value="income">只看收入</option>
+              </select>
             </div>
             <div id="emptyState" class="empty-state">这个月还没有记录</div>
             <ul id="entryList" class="entry-list"></ul>
@@ -137,6 +168,32 @@
             </div>
           </section>
 
+          <section class="card insight-card">
+            <div class="section-title">
+              <h2>本月洞察</h2>
+            </div>
+            <div class="insight-grid">
+              <article>
+                <span>最大支出</span>
+                <strong id="largestExpense">¥0.00</strong>
+                <p id="largestExpenseNote">暂无</p>
+              </article>
+              <article>
+                <span>日均支出</span>
+                <strong id="dailyAverage">¥0.00</strong>
+                <p>按本月已过天数估算</p>
+              </article>
+            </div>
+            <p class="budget-advice" id="budgetAdvice">设置预算后，会在这里提醒本月花费节奏。</p>
+          </section>
+
+          <section class="card">
+            <div class="section-title">
+              <h2>最近 7 天</h2>
+            </div>
+            <div id="sevenDayChart" class="day-bars"></div>
+          </section>
+
           <section class="card">
             <div class="section-title">
               <h2>分类支出</h2>
@@ -146,6 +203,27 @@
         </section>
 
         <section class="view" id="reportsView" aria-label="报告">
+          <section class="card">
+            <div class="section-title">
+              <h2>年度总览</h2>
+              <span id="yearLabel"></span>
+            </div>
+            <div class="wide-stats">
+              <article>
+                <span>年支出</span>
+                <strong class="expense-text" id="yearExpense">¥0.00</strong>
+              </article>
+              <article>
+                <span>年收入</span>
+                <strong class="income-text" id="yearIncome">¥0.00</strong>
+              </article>
+              <article>
+                <span>年结余</span>
+                <strong id="yearBalance">¥0.00</strong>
+              </article>
+            </div>
+          </section>
+
           <section class="card">
             <div class="section-title">
               <h2>月度报告</h2>
@@ -165,7 +243,24 @@
 
           <section class="card">
             <div class="section-title">
+              <h2>显示模式</h2>
+            </div>
+            <div class="theme-options" role="group" aria-label="显示模式">
+              <label>
+                <input type="radio" name="themeMode" value="light">
+                <span>白天模式</span>
+              </label>
+              <label>
+                <input type="radio" name="themeMode" value="dark">
+                <span>晚上模式</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="section-title">
               <h2>备份与恢复</h2>
+              <span id="backupAge">未备份</span>
             </div>
             <div class="backup-actions">
               <button id="exportButton" class="secondary-button" type="button">导出备份</button>
@@ -173,6 +268,7 @@
                 导入备份
                 <input id="importInput" type="file" accept="application/json,.json">
               </label>
+              <button id="exportCsvButton" class="secondary-button" type="button">导出 CSV</button>
             </div>
             <p id="backupStatus" class="helper-text" role="status">换手机前先导出，换手机后再导入。</p>
           </section>
@@ -220,10 +316,11 @@
           <strong class="entry-amount"></strong>
           <time class="entry-date"></time>
           <button class="delete-button" type="button" aria-label="删除记录">删除</button>
+          <button class="edit-button" type="button" aria-label="编辑记录">编辑</button>
         </div>
       </li>
     </template>
 
-    <script src="app.js" defer></script>
+    <script src="/-personal-ledger-pwa/app.js?v=6" defer></script>
   </body>
 </html>
