@@ -213,7 +213,7 @@ function bindEvents() {
 function applyTheme(theme) {
   const normalized = theme === "dark" ? "dark" : "light";
   document.body.dataset.theme = normalized;
-  document.querySelector("meta[name='theme-color']").setAttribute("content", normalized === "dark" ? "#101413" : "#f4f7f6");
+  document.querySelector("meta[name='theme-color']").setAttribute("content", normalized === "dark" ? "#101923" : "#bdeef8");
   els.themeInputs.forEach((input) => {
     input.checked = input.value === normalized;
   });
