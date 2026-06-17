@@ -1,0 +1,394 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f7f4;
+  --surface: #ffffff;
+  --surface-soft: #eef7f4;
+  --text: #17201c;
+  --muted: #66736d;
+  --line: #dce4df;
+  --brand: #0f766e;
+  --brand-dark: #115e59;
+  --income: #13804f;
+  --expense: #c2410c;
+  --shadow: 0 16px 40px rgba(20, 31, 28, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, #d7eee9 0, rgba(215, 238, 233, 0) 280px),
+    var(--bg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  width: min(100%, 520px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 2px 16px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--brand-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+.icon-button,
+.nav-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--brand);
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.24);
+}
+
+.icon-button {
+  width: 44px;
+  height: 44px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.nav-button {
+  width: 42px;
+  height: 42px;
+  font-size: 28px;
+}
+
+.month-panel,
+.entry-panel,
+.list-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(220, 228, 223, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.month-panel {
+  padding: 14px;
+}
+
+.month-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: end;
+  gap: 10px;
+}
+
+.month-picker-label,
+.field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.month-picker-label input,
+.field input,
+.field select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+}
+
+.month-picker-label input:focus,
+.field input:focus,
+.field select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.summary-card {
+  min-width: 0;
+  border-radius: 8px;
+  padding: 11px 10px;
+  background: var(--surface-soft);
+}
+
+.summary-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summary-card strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: clamp(15px, 4.2vw, 20px);
+  line-height: 1.15;
+}
+
+.summary-card.income strong {
+  color: var(--income);
+}
+
+.summary-card.expense strong {
+  color: var(--expense);
+}
+
+.entry-panel {
+  padding: 14px;
+}
+
+form {
+  display: grid;
+  gap: 12px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f4f8f6;
+}
+
+.segmented label {
+  min-width: 0;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.segmented input:checked + span {
+  color: #fff;
+  background: var(--brand);
+}
+
+.primary-button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--brand);
+  font-weight: 850;
+  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.2);
+}
+
+.primary-button:active,
+.nav-button:active,
+.icon-button:active {
+  transform: translateY(1px);
+}
+
+.list-panel {
+  overflow: hidden;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 10px;
+}
+
+.text-button {
+  border: 0;
+  color: var(--brand-dark);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.empty-state {
+  padding: 24px 14px 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.entry-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line);
+}
+
+.entry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 74px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.entry-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.entry-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.entry-item.expense .entry-icon {
+  background: var(--expense);
+}
+
+.entry-item.income .entry-icon {
+  background: var(--income);
+}
+
+.entry-category {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-note {
+  overflow: hidden;
+  max-width: 190px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-side {
+  display: grid;
+  justify-items: end;
+  flex: 0 0 auto;
+  gap: 3px;
+}
+
+.entry-amount {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.entry-item.expense .entry-amount {
+  color: var(--expense);
+}
+
+.entry-item.income .entry-amount {
+  color: var(--income);
+}
+
+.entry-date {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.delete-button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: #8a2a0a;
+  background: #fff1e9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 360px) {
+  .app-shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-note {
+    max-width: 135px;
+  }
+}
